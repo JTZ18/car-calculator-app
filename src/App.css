@@ -1,38 +1,119 @@
 .App {
+  font-family: sans-serif;
+  max-width: 900px;
+  margin: 20px auto;
+  padding: 20px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+h1, h2 {
   text-align: center;
+  color: #333;
 }
 
-.App-logo {
-  height: 40vmin;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .App-logo {
-    animation: App-logo-spin infinite 20s linear;
-  }
-}
-
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
+.inputs-container {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
+  justify-content: space-around;
+  margin-bottom: 30px;
+  gap: 20px; /* Adds space between the input groups */
+  flex-wrap: wrap; /* Allows groups to wrap on smaller screens */
 }
 
-.App-link {
-  color: #61dafb;
+.input-group {
+  border: 1px solid #ddd;
+  padding: 15px;
+  border-radius: 5px;
+  background-color: #fff;
+  min-width: 250px; /* Minimum width for each car's input section */
+  flex: 1; /* Allows groups to grow */
 }
 
-@keyframes App-logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.input-group h2 {
+  margin-top: 0;
+  font-size: 1.2em;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+  margin-bottom: 15px;
 }
+
+label {
+  display: block; /* Each label/input pair on a new line */
+  margin-bottom: 12px;
+  font-weight: bold;
+  color: #555;
+}
+
+input[type="number"] {
+  width: calc(100% - 16px); /* Adjust width considering padding */
+  padding: 8px;
+  margin-top: 4px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1em;
+}
+
+/* Remove spinners from number inputs (optional) */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield; /* Firefox */
+}
+
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.results-table th,
+.results-table td {
+  border: 1px solid #ddd;
+  padding: 10px 12px; /* Increased padding */
+  text-align: right; /* Align numbers to the right */
+}
+
+.results-table th {
+  background-color: #e9e9e9; /* Header background */
+  font-weight: bold;
+  text-align: center; /* Center align header text */
+}
+
+.results-table td:first-child,
+.results-table th:first-child {
+  text-align: left; /* Align first column (labels) to the left */
+  font-weight: bold;
+  color: #444;
+}
+
+
+.results-table tbody tr:nth-child(even) {
+  background-color: #f7f7f7; /* Zebra striping for rows */
+}
+
+.results-table .calculated-row td {
+  font-style: italic; /* Italicize calculated rows */
+  color: #0056b3; /* Give calculated rows a distinct color */
+}
+
+.results-table .final-cash td {
+   font-weight: bold; /* Make the final cash row bold */
+   color: #28a745; /* Green color for positive cash */
+}
+
+ /* Style negative cash red (add this if needed) */
+.results-table .final-cash td:not(:first-child) {
+  /* Select only numeric cells */
+  /* This requires JS to add a class conditionally, or more complex CSS selectors */
+  /* For simplicity, we are keeping the green color for now */
+}
+
+/* You might need to add specific classes using JS if you want
+   to dynamically style negative numbers in red, for example. */
