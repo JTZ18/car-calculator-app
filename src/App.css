@@ -1,6 +1,7 @@
+/* Keep all previous styles from the last response */
 .App {
   font-family: sans-serif;
-  max-width: 900px;
+  max-width: 950px; /* Slightly wider for new elements */
   margin: 20px auto;
   padding: 20px;
   border: 1px solid #ccc;
@@ -13,21 +14,61 @@ h1, h2 {
   color: #333;
 }
 
+/* --- Styles for Shared Parameters --- */
+.shared-parameters {
+  border: 1px solid #ddd;
+  padding: 15px 20px; /* More horizontal padding */
+  border-radius: 5px;
+  background-color: #fff;
+  margin-bottom: 30px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.shared-parameters h2 {
+  margin-top: 0;
+  font-size: 1.2em;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+  margin-bottom: 15px;
+  text-align: left; /* Align heading left */
+}
+
+.parameter-group {
+    display: flex;
+    gap: 30px; /* Space between rate and term */
+    flex-wrap: wrap;
+}
+
+.parameter-group label {
+    display: flex; /* Align label and input nicely */
+    flex-direction: column; /* Stack label above input */
+    flex-grow: 1; /* Allow them to take space */
+    min-width: 150px; /* Minimum width */
+}
+
+.parameter-group input[type="number"] {
+  width: 100%; /* Make inputs fill their container */
+  box-sizing: border-box; /* Include padding in width */
+}
+
+
+/* --- Styles for Input Containers --- */
 .inputs-container {
   display: flex;
   justify-content: space-around;
   margin-bottom: 30px;
-  gap: 20px; /* Adds space between the input groups */
-  flex-wrap: wrap; /* Allows groups to wrap on smaller screens */
+  gap: 25px; /* Increased space */
+  flex-wrap: wrap;
 }
 
 .input-group {
   border: 1px solid #ddd;
-  padding: 15px;
+  padding: 20px; /* Increased padding */
   border-radius: 5px;
   background-color: #fff;
-  min-width: 250px; /* Minimum width for each car's input section */
-  flex: 1; /* Allows groups to grow */
+  min-width: 300px; /* Minimum width */
+  flex: 1;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
 .input-group h2 {
@@ -36,84 +77,152 @@ h1, h2 {
   border-bottom: 1px solid #eee;
   padding-bottom: 5px;
   margin-bottom: 15px;
+  text-align: left;
 }
 
 label {
-  display: block; /* Each label/input pair on a new line */
-  margin-bottom: 12px;
+  display: block;
+  margin-bottom: 10px; /* Adjusted margin */
   font-weight: bold;
   color: #555;
 }
 
 input[type="number"] {
-  width: calc(100% - 16px); /* Adjust width considering padding */
-  padding: 8px;
-  margin-top: 4px;
+  width: calc(100% - 18px); /* Adjust width */
+  padding: 9px; /* Slightly larger */
+  margin-top: 5px; /* Spacing */
   border: 1px solid #ccc;
   border-radius: 4px;
   font-size: 1em;
+  box-sizing: border-box;
 }
 
-/* Remove spinners from number inputs (optional) */
+/* Remove spinners */
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
 input[type=number] {
-  -moz-appearance: textfield; /* Firefox */
+  -moz-appearance: textfield;
 }
 
+/* --- Styles for "Set Loan by Percentage" --- */
+.set-percentage-group {
+  margin-top: -5px; /* Pull up slightly */
+  margin-bottom: 15px;
+  padding: 10px;
+  border: 1px dashed #e0e0e0; /* Subtle border */
+  border-radius: 4px;
+  background-color: #fafafa;
+  display: flex;
+  align-items: center; /* Align items vertically */
+  flex-wrap: wrap; /* Allow wrapping */
+  gap: 8px; /* Space between elements */
+}
 
+.set-percentage-group .inline-label {
+  display: inline; /* Make label inline */
+  margin-bottom: 0; /* Remove bottom margin */
+  font-weight: normal; /* Less emphasis */
+  color: #666;
+  margin-right: 5px;
+}
+
+.set-percentage-group .percentage-input {
+  width: 60px; /* Fixed width for percentage input */
+  padding: 6px 8px;
+  font-size: 0.95em;
+  text-align: right;
+  margin: 0; /* Remove default margins */
+}
+
+.set-percentage-group .apply-button {
+  padding: 6px 12px;
+  font-size: 0.9em;
+  cursor: pointer;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.set-percentage-group .apply-button:hover {
+  background-color: #0056b3;
+}
+
+.set-percentage-group .calculated-percentage {
+    font-size: 0.9em;
+    color: #555;
+    margin-left: auto; /* Push to the right if space allows */
+    white-space: nowrap; /* Prevent wrapping */
+    padding-left: 10px;
+}
+
+/* --- Styles for Results Table --- */
 .results-table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 20px;
+  margin-top: 25px;
   background-color: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Slightly stronger shadow */
 }
 
 .results-table th,
 .results-table td {
   border: 1px solid #ddd;
-  padding: 10px 12px; /* Increased padding */
-  text-align: right; /* Align numbers to the right */
+  padding: 11px 14px; /* Increased padding */
+  text-align: right;
 }
 
 .results-table th {
-  background-color: #e9e9e9; /* Header background */
-  font-weight: bold;
-  text-align: center; /* Center align header text */
+  background-color: #e9ecef; /* Slightly different header color */
+  font-weight: 600; /* Slightly bolder */
+  text-align: center;
+  font-size: 0.95em;
+  color: #495057;
 }
 
 .results-table td:first-child,
 .results-table th:first-child {
-  text-align: left; /* Align first column (labels) to the left */
+  text-align: left;
   font-weight: bold;
-  color: #444;
+  color: #343a40; /* Darker label color */
 }
 
-
 .results-table tbody tr:nth-child(even) {
-  background-color: #f7f7f7; /* Zebra striping for rows */
+  background-color: #f8f9fa; /* Subtle zebra striping */
 }
 
 .results-table .calculated-row td {
-  font-style: italic; /* Italicize calculated rows */
-  color: #0056b3; /* Give calculated rows a distinct color */
+  font-style: italic;
+  color: #17a2b8; /* Teal color for calculated rows */
 }
+
+/* Specific styling for percentage row */
+.results-table .percentage-row td {
+    font-style: normal; /* Not italic */
+    font-size: 0.95em;
+    color: #6c757d; /* Grey color */
+    background-color: #fdfdfe; /* Slightly off-white */
+}
+.results-table .percentage-row td:first-child {
+    font-weight: normal; /* Not bold */
+}
+
 
 .results-table .final-cash td {
-   font-weight: bold; /* Make the final cash row bold */
-   color: #28a745; /* Green color for positive cash */
+   font-weight: bold;
+   font-style: normal; /* Override italic */
+   /* Color is set inline in JSX based on value */
 }
 
- /* Style negative cash red (add this if needed) */
-.results-table .final-cash td:not(:first-child) {
-  /* Select only numeric cells */
-  /* This requires JS to add a class conditionally, or more complex CSS selectors */
-  /* For simplicity, we are keeping the green color for now */
+.results-table .final-cash td:first-child {
+   color: #343a40 !important; /* Ensure label color is standard */
 }
 
-/* You might need to add specific classes using JS if you want
-   to dynamically style negative numbers in red, for example. */
+/* Ensure total cash cell is bold */
+.results-table .final-cash td:last-child {
+    font-weight: bold !important;
+}
