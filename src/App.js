@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -476,6 +476,84 @@ function App() {
   const totalMonthly = effectiveMonthly1 + effectiveMonthly2;
   const totalBalance = totalPrice - totalLoan;
   const totalCash = totalBalance - totalTradeIn;
+
+  // --- Update Rule of 78 schedules when inputs change ---
+  useEffect(() => {
+    // Check if we need to update schedule1
+    if (schedule1 && !schedule1.error && useCar1) {
+      const months = (loanTermYears || 0) * 12;
+      const totalFlatInterest = calculateTotalFinanceChargeFlatRate(
+        loan1,
+        interestRate,
+        loanTermYears
+      );
+      const result = calculateRule78ScheduleInternal(
+        loan1,
+        months,
+        totalFlatInterest,
+        monthly1
+      );
+      
+      if (result && !result.error) {
+        setSchedule1(result);
+        
+        // If there was a payoff calculation, update it too
+        if (payoffDetails1 && !payoffDetails1.error) {
+          handleCalculatePayoff(result, setPayoffDetails1, payoffMonth1);
+        }
+      }
+    }
+    
+    // Check if we need to update schedule2
+    if (schedule2 && !schedule2.error && useCar2) {
+      const months = (loanTermYears || 0) * 12;
+      const totalFlatInterest = calculateTotalFinanceChargeFlatRate(
+        loan2,
+        interestRate,
+        loanTermYears
+      );
+      const result = calculateRule78ScheduleInternal(
+        loan2,
+        months,
+        totalFlatInterest,
+        monthly2
+      );
+      
+      if (result && !result.error) {
+        setSchedule2(result);
+        
+        // If there was a payoff calculation, update it too
+        if (payoffDetails2 && !payoffDetails2.error) {
+          handleCalculatePayoff(result, setPayoffDetails2, payoffMonth2);
+        }
+      }
+    }
+    
+    // Check if we need to update combined schedule
+    if (scheduleCombined && !scheduleCombined.error && carSelection === "both") {
+      const months = (loanTermYears || 0) * 12;
+      const totalCombinedFlatInterest = calculateTotalFinanceChargeFlatRate(
+        totalLoan,
+        interestRate,
+        loanTermYears
+      );
+      const result = calculateRule78ScheduleInternal(
+        totalLoan,
+        months,
+        totalCombinedFlatInterest,
+        totalMonthly
+      );
+      
+      if (result && !result.error) {
+        setScheduleCombined(result);
+        
+        // If there was a payoff calculation, update it too
+        if (payoffDetailsCombined && !payoffDetailsCombined.error) {
+          handleCalculatePayoff(result, setPayoffDetailsCombined, payoffMonthCombined);
+        }
+      }
+    }
+  }, [loan1, loan2, interestRate, loanTermYears, carSelection, totalLoan, monthly1, monthly2, totalMonthly]);
 
   // --- Handlers ---
   const handleInputChange = (setter) => (event) => {
