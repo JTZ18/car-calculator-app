@@ -1,123 +1,694 @@
-import React, { useState, useEffect } from 'react';
-import './App.css'; // We'll update this file next
+import React, { useState } from "react";
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import annotationPlugin from "chartjs-plugin-annotation";
+import "./App.css";
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  annotationPlugin
+);
+
+// --- Formatting Helpers ---
+const formatScheduleNumber = (num) => {
+  const number = Number(num);
+  if (isNaN(number)) return "0.00";
+  return number.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+const formatSummaryNumber = (num) => {
+  const number = Number(num);
+  if (isNaN(number)) return "0";
+  return number.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+};
+const formatPercent = (num) => {
+  if (typeof num !== "number" || isNaN(num)) return "0.0%";
+  return num.toFixed(1) + "%";
+};
+
+// --- Rule of 78 Calculation Function ---
+const calculateRule78ScheduleInternal = (
+  loanAmount,
+  numberOfMonths,
+  totalFinanceCharge,
+  monthlyPayment
+) => {
+  loanAmount = Number(loanAmount) || 0;
+  numberOfMonths = Number(numberOfMonths) || 0;
+  totalFinanceCharge = Number(totalFinanceCharge) || 0;
+  monthlyPayment = Number(monthlyPayment) || 0;
+
+  if (
+    loanAmount <= 0 ||
+    monthlyPayment <= 0 ||
+    numberOfMonths <= 0 ||
+    !Number.isInteger(numberOfMonths)
+  ) {
+    return {
+      error:
+        "Invalid inputs: Loan Amount, Monthly Payment, and Term (in months) must be positive numbers. Term must be an integer.",
+    };
+  }
+  if (totalFinanceCharge < 0) {
+    console.warn(
+      "Warning: Total finance charge is negative. Proceeding with 0 interest calculation."
+    );
+    totalFinanceCharge = 0;
+  }
+  if (monthlyPayment * numberOfMonths < loanAmount + totalFinanceCharge - 1) {
+    console.warn(
+      `Potential Issue: Total payments (${(
+        monthlyPayment * numberOfMonths
+      ).toFixed(2)}) seem less than loan (${loanAmount.toFixed(
+        2
+      )}) + total interest (${totalFinanceCharge.toFixed(
+        2
+      )}). Schedule might not amortize correctly.`
+    );
+  }
+
+  const sumOfDigits = (numberOfMonths * (numberOfMonths + 1)) / 2;
+  let schedule = [];
+  let currentBalance = loanAmount;
+  let accumulatedInterestCheck = 0;
+
+  for (let month = 1; month <= numberOfMonths; month++) {
+    const startBalance = parseFloat(currentBalance.toFixed(2));
+    let interestForMonth;
+    let principalForMonth;
+    const isLastMonth = month === numberOfMonths;
+
+    const interestProportion =
+      sumOfDigits > 0 ? (numberOfMonths - month + 1) / sumOfDigits : 0;
+    interestForMonth =
+      totalFinanceCharge > 0 && sumOfDigits > 0
+        ? parseFloat((interestProportion * totalFinanceCharge).toFixed(2))
+        : 0;
+
+    if (interestForMonth > monthlyPayment && !isLastMonth) {
+      console.warn(
+        `Month ${month}: Calculated interest (${interestForMonth.toFixed(
+          2
+        )}) exceeds payment (${monthlyPayment.toFixed(
+          2
+        )}). Clamping principal to 0.`
+      );
+      interestForMonth = monthlyPayment;
+      principalForMonth = 0;
+    }
+
+    if (isLastMonth) {
+      principalForMonth = startBalance;
+      let lastInterestCalculated = parseFloat(
+        (monthlyPayment - principalForMonth).toFixed(2)
+      ); // Actual interest based on final payment
+      // Still DISPLAY the rule-based interest for consistency with Rule of 78 examples
+      interestForMonth =
+        totalFinanceCharge > 0 && sumOfDigits > 0
+          ? parseFloat(((1 / sumOfDigits) * totalFinanceCharge).toFixed(2))
+          : 0;
+
+      if (monthlyPayment < principalForMonth - 0.005) {
+        console.warn(
+          `Last month's standard payment ($${monthlyPayment.toFixed(
+            2
+          )}) is less than the remaining balance ($${startBalance.toFixed(
+            2
+          )}). Adjusting final principal.`
+        );
+        // Principal is what's left after rule-based interest from fixed payment
+        principalForMonth = parseFloat(
+          (monthlyPayment - interestForMonth).toFixed(2)
+        );
+        if (principalForMonth < 0) principalForMonth = 0;
+      } else {
+        // Ensure principal clears the balance if payment is sufficient
+        principalForMonth = startBalance;
+      }
+    } else {
+      principalForMonth = parseFloat(
+        (monthlyPayment - interestForMonth).toFixed(2)
+      );
+      if (principalForMonth < 0) {
+        console.warn(
+          `Warning: Month ${month} interest ($${interestForMonth.toFixed(
+            2
+          )}) causes negative principal. Setting principal to 0.`
+        );
+        principalForMonth = 0;
+      }
+    }
+
+    let endBalance = parseFloat((startBalance - principalForMonth).toFixed(2));
+    schedule.push({
+      month: month,
+      startBalance: startBalance.toFixed(2),
+      interest: interestForMonth.toFixed(2),
+      principal: principalForMonth.toFixed(2),
+      endBalance:
+        isLastMonth && Math.abs(endBalance) < 0.01
+          ? "0.00"
+          : endBalance.toFixed(2),
+    });
+    accumulatedInterestCheck += interestForMonth;
+    currentBalance = endBalance;
+    if (currentBalance < -1) {
+      // Allow small negative from rounding
+      console.error(
+        "Error: Balance went significantly negative during calculation. Stopping."
+      );
+      return {
+        error: "Calculation error resulted in a significant negative balance.",
+      };
+    }
+  }
+
+  const finalAccumulatedInterest = parseFloat(
+    accumulatedInterestCheck.toFixed(2)
+  );
+  const tolerance = Math.max(0.01, numberOfMonths * 0.005);
+  if (
+    totalFinanceCharge > 0 &&
+    Math.abs(finalAccumulatedInterest - totalFinanceCharge) > tolerance
+  ) {
+    console.warn(
+      `Verification Warning: Sum of Rule of 78 monthly interest (${finalAccumulatedInterest.toFixed(
+        2
+      )}) differs from the initial total finance charge (${totalFinanceCharge.toFixed(
+        2
+      )}) by more than the tolerance ($${tolerance.toFixed(2)}).`
+    );
+  }
+
+  return {
+    loanAmount: loanAmount,
+    monthlyPayment: monthlyPayment,
+    numberOfMonths: numberOfMonths,
+    schedule: schedule,
+    totalFinanceCharge: totalFinanceCharge.toFixed(2),
+    sumOfDigits: sumOfDigits,
+    error: null,
+  };
+};
+
+// PayoffChart component for visualizing payment breakdown
+const PayoffChart = ({ chartData }) => {
+  if (!chartData) return null;
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: "index",
+      intersect: false,
+    },
+    plugins: {
+      legend: {
+        position: "top",
+      },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            let label = context.dataset.label || "";
+            if (label) {
+              label += ": ";
+            }
+            if (context.parsed.y !== null) {
+              label += new Intl.NumberFormat("en-US", {
+                style: "currency",
+                currency: "USD",
+                minimumFractionDigits: 2,
+              }).format(context.parsed.y);
+            }
+            return label;
+          },
+        },
+      },
+      annotation: chartData.payoffPoint
+        ? {
+            annotations: {
+              payoffLine: {
+                type: "line",
+                xMin: chartData.payoffPoint,
+                xMax: chartData.payoffPoint,
+                borderColor: "rgba(255, 0, 0, 0.5)",
+                borderWidth: 2,
+                label: {
+                  display: true,
+                  content: "Payoff Point",
+                  position: "start",
+                },
+              },
+            },
+          }
+        : {},
+    },
+    scales: {
+      x: {
+        title: {
+          display: true,
+          text: "Month",
+        },
+      },
+      y: {
+        title: {
+          display: true,
+          text: "Amount ($)",
+        },
+        ticks: {
+          callback: function (value) {
+            return new Intl.NumberFormat("en-US", {
+              style: "currency",
+              currency: "USD",
+              notation: "compact",
+              compactDisplay: "short",
+            }).format(value);
+          },
+        },
+      },
+    },
+  };
+
+  const data = {
+    labels: chartData.labels,
+    datasets: [
+      {
+        label: "Principal Payment",
+        data: chartData.principal,
+        borderColor: "rgba(53, 162, 235, 0.8)",
+        backgroundColor: "rgba(53, 162, 235, 0.5)",
+      },
+      {
+        label: "Interest Payment",
+        data: chartData.interest,
+        borderColor: "rgba(255, 99, 132, 0.8)",
+        backgroundColor: "rgba(255, 99, 132, 0.5)",
+      },
+      {
+        label: "Remaining Balance",
+        data: chartData.balance,
+        borderColor: "rgba(75, 192, 192, 0.8)",
+        backgroundColor: "rgba(75, 192, 192, 0.5)",
+        yAxisID: "y",
+      },
+    ],
+  };
+
+  return (
+    <div className="chart-container">
+      <Line options={options} data={data} height={300} />
+    </div>
+  );
+};
 
 function App() {
-  // --- Shared Loan Parameters ---
-  const [interestRate, setInterestRate] = useState(2.48); // Default based on UOB example
-  const [loanTermYears, setLoanTermYears] = useState(7); // Default based on UOB example
-
-  // --- State for Car 1 Inputs ---
-  const [price1, setPrice1] = useState(216988);
-  const [loan1, setLoan1] = useState(130000);
-  const [tradeIn1, setTradeIn1] = useState(85000);
-  const [targetPercent1, setTargetPercent1] = useState(95); // For the "Set to %" feature
-
-  // --- State for Car 2 Inputs ---
-  const [price2, setPrice2] = useState(171988);
-  const [loan2, setLoan2] = useState(90000);
-  const [tradeIn2, setTradeIn2] = useState(61000);
-  const [targetPercent2, setTargetPercent2] = useState(95); // For the "Set to %" feature
+  // --- State ---
+  const [carSelection, setCarSelection] = useState("both");
+  const [discountAmount, setDiscountAmount] = useState(0);
+  const [interestRate, setInterestRate] = useState(2.48);
+  const [loanTermYears, setLoanTermYears] = useState(7);
+  const [price1, setPrice1] = useState(208988);
+  const [loan1, setLoan1] = useState(100000);
+  const [tradeIn1, setTradeIn1] = useState(90000);
+  const [targetPercent1, setTargetPercent1] = useState(60);
+  const [price2, setPrice2] = useState(165988);
+  const [loan2, setLoan2] = useState(80000);
+  const [tradeIn2, setTradeIn2] = useState(65000);
+  const [targetPercent2, setTargetPercent2] = useState(60);
+  const [schedule1, setSchedule1] = useState(null);
+  const [schedule2, setSchedule2] = useState(null);
+  const [payoffDetails1, setPayoffDetails1] = useState(null);
+  const [payoffDetails2, setPayoffDetails2] = useState(null);
+  const [scheduleCombined, setScheduleCombined] = useState(null);
+  const [payoffDetailsCombined, setPayoffDetailsCombined] = useState(null);
+  const [payoffMonth1, setPayoffMonth1] = useState(12);
+  const [payoffMonth2, setPayoffMonth2] = useState(12);
+  const [payoffMonthCombined, setPayoffMonthCombined] = useState(12);
 
   // --- Calculation Functions ---
-
-  // Flat Rate Monthly Payment Calculation
-  const calculateMonthlyPayment = (loanAmount, annualRatePercent, termYears) => {
+  const calculateMonthlyPaymentFlatRate = (
+    loanAmount,
+    annualRatePercent,
+    termYears
+  ) => {
     loanAmount = Number(loanAmount) || 0;
     annualRatePercent = Number(annualRatePercent) || 0;
     termYears = Number(termYears) || 0;
-
-    if (loanAmount <= 0 || annualRatePercent <= 0 || termYears <= 0) {
-      return 0; // No payment if inputs are invalid/zero
+    if (loanAmount <= 0 || termYears <= 0) {
+      return loanAmount / (termYears * 12) || 0;
     }
+    if (annualRatePercent < 0) annualRatePercent = 0;
     const annualRate = annualRatePercent / 100;
     const totalInterest = loanAmount * annualRate * termYears;
     const totalPayable = loanAmount + totalInterest;
     const numberOfMonths = termYears * 12;
-
-    if (numberOfMonths === 0) return 0; // Avoid division by zero
-
-    // Round to match UOB example (integer) - use toFixed(2) for cents
+    if (numberOfMonths === 0) return 0;
     return Math.round(totalPayable / numberOfMonths);
   };
-
-  // Calculate Loan Percentage
+  const calculateTotalFinanceChargeFlatRate = (
+    loanAmount,
+    annualRatePercent,
+    termYears
+  ) => {
+    loanAmount = Number(loanAmount) || 0;
+    annualRatePercent = Number(annualRatePercent) || 0;
+    termYears = Number(termYears) || 0;
+    if (loanAmount <= 0 || annualRatePercent < 0 || termYears <= 0) return 0;
+    const annualRate = annualRatePercent / 100;
+    return loanAmount * annualRate * termYears;
+  };
   const calculateLoanPercentage = (loanAmount, carPrice) => {
     loanAmount = Number(loanAmount) || 0;
     carPrice = Number(carPrice) || 0;
-    if (carPrice === 0) return 0; // Avoid division by zero
+    if (carPrice === 0) return 0;
     return (loanAmount / carPrice) * 100;
   };
 
-  // --- Derived Values (Calculated directly for display) ---
+  // --- Derived Values & Totals ---
   const balance1 = (price1 || 0) - (loan1 || 0);
   const cash1 = balance1 - (tradeIn1 || 0);
-  const monthly1 = calculateMonthlyPayment(loan1, interestRate, loanTermYears);
+  const monthly1 = calculateMonthlyPaymentFlatRate(
+    loan1,
+    interestRate,
+    loanTermYears
+  );
   const loanPercent1 = calculateLoanPercentage(loan1, price1);
-
   const balance2 = (price2 || 0) - (loan2 || 0);
   const cash2 = balance2 - (tradeIn2 || 0);
-  const monthly2 = calculateMonthlyPayment(loan2, interestRate, loanTermYears);
+  const monthly2 = calculateMonthlyPaymentFlatRate(
+    loan2,
+    interestRate,
+    loanTermYears
+  );
   const loanPercent2 = calculateLoanPercentage(loan2, price2);
+  const useCar1 = carSelection === "car1" || carSelection === "both";
+  const useCar2 = carSelection === "car2" || carSelection === "both";
+  const effectivePrice1 = useCar1 ? price1 || 0 : 0;
+  const effectiveLoan1 = useCar1 ? loan1 || 0 : 0;
+  const effectiveTradeIn1 = useCar1 ? tradeIn1 || 0 : 0;
+  const effectiveMonthly1 = useCar1 ? monthly1 : 0;
+  const effectiveBalance1 = useCar1 ? balance1 : 0;
+  const effectivePrice2 = useCar2 ? price2 || 0 : 0;
+  const effectiveLoan2 = useCar2 ? loan2 || 0 : 0;
+  const effectiveTradeIn2 = useCar2 ? tradeIn2 || 0 : 0;
+  const effectiveMonthly2 = useCar2 ? monthly2 : 0;
+  const effectiveBalance2 = useCar2 ? balance2 : 0;
+  const rawTotalPrice = effectivePrice1 + effectivePrice2;
+  const effectiveDiscount = Number(discountAmount) || 0;
+  const totalPrice = rawTotalPrice - effectiveDiscount;
+  const totalLoan = effectiveLoan1 + effectiveLoan2;
+  const totalTradeIn = effectiveTradeIn1 + effectiveTradeIn2;
+  const totalMonthly = effectiveMonthly1 + effectiveMonthly2;
+  const totalBalance = totalPrice - totalLoan;
+  const totalCash = totalBalance - totalTradeIn;
 
-  // --- Totals ---
-  const totalPrice = (price1 || 0) + (price2 || 0);
-  const totalLoan = (loan1 || 0) + (loan2 || 0);
-  const totalBalance = balance1 + balance2;
-  const totalTradeIn = (tradeIn1 || 0) + (tradeIn2 || 0);
-  const totalCash = cash1 + cash2;
-  const totalMonthly = monthly1 + monthly2;
-
-  // --- Helper Functions ---
-
-  // Format numbers as currency (without $ sign, with commas)
-  const formatNumber = (num) => {
-    if (typeof num !== 'number') return '0';
-    // Use toLocaleString for comma separation, handle potential NaN
-    return (isNaN(num) ? 0 : num).toLocaleString('en-US', {
-        minimumFractionDigits: 0,
-        maximumFractionDigits: 0,
-    });
-  };
-
-   // Format percentage
-   const formatPercent = (num) => {
-    if (typeof num !== 'number' || isNaN(num)) return '0.0%';
-    return num.toFixed(1) + '%'; // One decimal place for percentage
-   };
-
-  // Generic input handler (ensures value is treated as number)
+  // --- Handlers ---
   const handleInputChange = (setter) => (event) => {
     const value = event.target.value;
-    // Allow empty string for clearing, otherwise convert to number
-    setter(value === '' ? '' : Number(value));
+    setter(value === "" ? "" : Number(value));
+  };
+  const handleSetLoanByPercent = (price, targetPercent, loanSetter) => {
+    const priceNum = Number(price) || 0;
+    const percentNum = Number(targetPercent) || 0;
+    if (priceNum > 0 && percentNum > 0) {
+      const newLoanAmount = Math.round(priceNum * (percentNum / 100));
+      loanSetter(newLoanAmount);
+    } else {
+      loanSetter(0);
+    }
+  };
+  const handleCarSelectionChange = (event) => {
+    setCarSelection(event.target.value);
+    // Optionally clear combined schedule when mode changes from 'both'
+    if (event.target.value !== "both") {
+      setScheduleCombined(null);
+    }
+  };
+  const handleCalculateSchedule1 = () => {
+    setPayoffDetails1(null);
+    const months = (loanTermYears || 0) * 12;
+    const totalFlatInterest = calculateTotalFinanceChargeFlatRate(
+      loan1,
+      interestRate,
+      loanTermYears
+    );
+    const result = calculateRule78ScheduleInternal(
+      loan1,
+      months,
+      totalFlatInterest,
+      monthly1
+    );
+    if (result && !result.error) {
+      setSchedule1(result);
+      setScheduleCombined(null);
+    } else {
+      setSchedule1({ error: result?.error || "Unknown error." });
+      alert(result?.error || "Could not calculate schedule.");
+    }
+  };
+  const handleCalculateSchedule2 = () => {
+    setPayoffDetails2(null);
+    const months = (loanTermYears || 0) * 12;
+    const totalFlatInterest = calculateTotalFinanceChargeFlatRate(
+      loan2,
+      interestRate,
+      loanTermYears
+    );
+    const result = calculateRule78ScheduleInternal(
+      loan2,
+      months,
+      totalFlatInterest,
+      monthly2
+    );
+    if (result && !result.error) {
+      setSchedule2(result);
+      setScheduleCombined(null);
+    } else {
+      setSchedule2({ error: result?.error || "Unknown error." });
+      alert(result?.error || "Could not calculate schedule.");
+    }
+  };
+  const handleCalculatePayoff = (
+    scheduleData,
+    setPayoffDetails,
+    payoffMonth
+  ) => {
+    if (!scheduleData || scheduleData.error || !scheduleData.schedule) {
+      alert("Payoff requires a valid schedule.");
+      setPayoffDetails({ error: "Invalid schedule data." });
+      return;
+    }
+
+    // Validate payoff month is within range
+    const totalMonths = scheduleData.numberOfMonths;
+    if (payoffMonth >= totalMonths) {
+      alert(
+        `Payoff month must be less than the total term (${totalMonths} months).`
+      );
+      setPayoffDetails({
+        error: `Payoff month (${payoffMonth}) must be less than total term (${totalMonths})`,
+      });
+      return;
+    }
+
+    if (payoffMonth < 1) {
+      alert("Payoff month must be at least 1.");
+      setPayoffDetails({ error: "Payoff month must be at least 1." });
+      return;
+    }
+
+    try {
+      const monthsToPayoff = scheduleData.schedule.slice(0, payoffMonth);
+      const totalPaidPrincipal = monthsToPayoff.reduce(
+        (sum, row) => sum + parseFloat(row.principal),
+        0
+      );
+      const totalPaidInterest = monthsToPayoff.reduce(
+        (sum, row) => sum + parseFloat(row.interest),
+        0
+      );
+      const totalPaid = totalPaidPrincipal + totalPaidInterest;
+
+      const remainingMonths = totalMonths - payoffMonth;
+      const totalSumDigits = scheduleData.sumOfDigits;
+      const originalTotalInterest = parseFloat(scheduleData.totalFinanceCharge);
+      const originalLoanAmount = scheduleData.loanAmount;
+      const monthlyPayment = scheduleData.monthlyPayment;
+
+      const sumDigitsRemaining = (remainingMonths * (remainingMonths + 1)) / 2;
+      const interestRebate =
+        totalSumDigits > 0
+          ? (sumDigitsRemaining / totalSumDigits) * originalTotalInterest
+          : 0;
+
+      const totalRemainingPayments = remainingMonths * monthlyPayment;
+      const payoffAmount = totalRemainingPayments - interestRebate;
+
+      const remainingPrincipal = originalLoanAmount - totalPaidPrincipal;
+      // Ensure remaining interest isn't negative due to rounding
+      const remainingInterestInPayoff = Math.max(
+        0,
+        payoffAmount - remainingPrincipal
+      );
+
+      // Calculate additional information for if user continues regular payments
+      const remainingInterestIfContinued =
+        originalTotalInterest - totalPaidInterest;
+      const totalRemainingPaymentIfContinued = remainingMonths * monthlyPayment;
+      const remainingPrincipalPayment = remainingPrincipal;
+
+      // Interest percentage breakdown
+      const interestPaidPercentage =
+        (totalPaidInterest / originalTotalInterest) * 100;
+      const interestRemainingPercentage =
+        (remainingInterestIfContinued / originalTotalInterest) * 100;
+
+      // Savings analysis
+      const interestSavings =
+        remainingInterestIfContinued - remainingInterestInPayoff;
+      const totalSavings = totalRemainingPaymentIfContinued - payoffAmount;
+
+      // Generate chart data
+      const chartData = {
+        labels: Array.from({ length: totalMonths }, (_, i) => i + 1),
+        principal: scheduleData.schedule.map((row) =>
+          parseFloat(row.principal)
+        ),
+        interest: scheduleData.schedule.map((row) => parseFloat(row.interest)),
+        balance: scheduleData.schedule.map((row) =>
+          parseFloat(row.startBalance)
+        ),
+        payoffPoint: payoffMonth,
+      };
+
+      setPayoffDetails({
+        totalPaidMonths: payoffMonth,
+        totalPaidPrincipal: totalPaidPrincipal.toFixed(2),
+        totalPaidInterest: totalPaidInterest.toFixed(2),
+        totalPaid: totalPaid.toFixed(2),
+        payoffAmount: payoffAmount.toFixed(2),
+        interestRebate: interestRebate.toFixed(2),
+        remainingPrincipalInPayoff: remainingPrincipal.toFixed(2),
+        remainingInterestInPayoff: remainingInterestInPayoff.toFixed(2),
+        // New fields
+        interestPaidPercentage: interestPaidPercentage.toFixed(1),
+        interestRemainingPercentage: interestRemainingPercentage.toFixed(1),
+        remainingTotalIfContinued: totalRemainingPaymentIfContinued.toFixed(2),
+        remainingPrincipalIfContinued: remainingPrincipalPayment.toFixed(2),
+        remainingInterestIfContinued: remainingInterestIfContinued.toFixed(2),
+        interestSavings: interestSavings.toFixed(2),
+        totalSavings: totalSavings.toFixed(2),
+        chartData: chartData,
+        error: null,
+      });
+    } catch (e) {
+      console.error("Error calculating payoff:", e);
+      setPayoffDetails({ error: "Calculation error." });
+      alert("Error calculating payoff details.");
+    }
+  };
+  const handleCalculateCombinedSchedule = () => {
+    setSchedule1(null);
+    setSchedule2(null);
+    setPayoffDetails1(null);
+    setPayoffDetails2(null);
+    setPayoffDetailsCombined(null);
+    if (carSelection !== "both") {
+      alert("Combined requires 'Both Cars' mode.");
+      return;
+    }
+    if (totalLoan <= 0 || loanTermYears <= 0) {
+      alert("Combined requires valid total loan & term.");
+      return;
+    }
+
+    const months = (loanTermYears || 0) * 12;
+    const totalCombinedFlatInterest = calculateTotalFinanceChargeFlatRate(
+      totalLoan,
+      interestRate,
+      loanTermYears
+    );
+    const result = calculateRule78ScheduleInternal(
+      totalLoan,
+      months,
+      totalCombinedFlatInterest,
+      totalMonthly
+    );
+    if (result && !result.error) {
+      setScheduleCombined(result);
+    } else {
+      setScheduleCombined({ error: result?.error || "Unknown error." });
+      alert(result?.error || "Could not calculate combined schedule.");
+    }
   };
 
-   // Handlers to set loan based on percentage
-   const handleSetLoanByPercent = (price, targetPercent, loanSetter) => {
-      const priceNum = Number(price) || 0;
-      const percentNum = Number(targetPercent) || 0;
-      if (priceNum > 0 && percentNum > 0) {
-          const newLoanAmount = Math.round(priceNum * (percentNum / 100));
-          loanSetter(newLoanAmount);
-      } else {
-          loanSetter(0); // Set loan to 0 if price or percent is invalid
-      }
-   };
-
-
+  // --- JSX ---
   return (
     <div className="App">
       <h1>Electric Vehicle Purchase Calculator</h1>
 
-      {/* --- Shared Loan Parameters --- */}
-      <div className="shared-parameters">
+      {/* --- Config Sections --- */}
+      <div className="config-section car-selection">
+        <h3>Calculation Mode</h3>
+        <div className="radio-group">
+          <label>
+            <input
+              type="radio"
+              value="car1"
+              checked={carSelection === "car1"}
+              onChange={handleCarSelectionChange}
+            />{" "}
+            Car 1 Only
+          </label>
+          <label>
+            <input
+              type="radio"
+              value="car2"
+              checked={carSelection === "car2"}
+              onChange={handleCarSelectionChange}
+            />{" "}
+            Car 2 Only
+          </label>
+          <label>
+            <input
+              type="radio"
+              value="both"
+              checked={carSelection === "both"}
+              onChange={handleCarSelectionChange}
+            />{" "}
+            Both Cars
+          </label>
+        </div>
+      </div>
+      <div className="config-section shared-parameters">
         <h2>Loan Parameters (Shared)</h2>
         <div className="parameter-group">
-           <label>
+          <label>
             Annual Interest Rate (%):
             <input
               type="number"
-              step="0.01" // Allow decimals
+              step="0.01"
               value={interestRate}
               onChange={handleInputChange(setInterestRate)}
               placeholder="e.g., 2.48"
@@ -128,6 +699,7 @@ function App() {
             <input
               type="number"
               step="1"
+              min="1"
               value={loanTermYears}
               onChange={handleInputChange(setLoanTermYears)}
               placeholder="e.g., 7"
@@ -135,174 +707,1030 @@ function App() {
           </label>
         </div>
       </div>
+      <div className="config-section discount-section">
+        <h2>Discounts</h2>
+        <div className="parameter-group">
+          <label>
+            Seller Discount ($):
+            <input
+              type="number"
+              step="1"
+              value={discountAmount}
+              onChange={handleInputChange(setDiscountAmount)}
+              placeholder="e.g., 5000"
+            />
+          </label>
+        </div>
+      </div>
 
-      {/* --- Car Specific Inputs --- */}
+      {/* --- Car Inputs --- */}
       <div className="inputs-container">
-        {/* --- Car 1 Inputs --- */}
-        <div className="input-group">
-          <h2>Car 1 (e.g., HYPTEC)</h2>
-          <label>
-            New Car Price ($):
-            <input
-              type="number"
-              value={price1}
-              onChange={handleInputChange(setPrice1)}
-              placeholder="Enter Price"
-            />
-          </label>
-          <label>
-            Loan Amount ($):
-            <input
-              type="number"
-              value={loan1}
-              onChange={handleInputChange(setLoan1)}
-              placeholder="Enter Loan Amount"
-            />
-          </label>
-          {/* --- Set Loan by Percentage Feature --- */}
-           <div className="set-percentage-group">
-             <label htmlFor="targetPercent1Input" className="inline-label">Set loan to:</label>
-             <input
-                id="targetPercent1Input"
+        {useCar1 && (
+          <div className="input-group">
+            <h2>Car 1 (e.g., HYPTEC)</h2>
+            <label>
+              New Car Price ($):
+              <input
+                type="number"
+                value={price1}
+                onChange={handleInputChange(setPrice1)}
+                placeholder="Price"
+              />
+            </label>
+            <label>
+              Loan Amount ($):
+              <input
+                type="number"
+                value={loan1}
+                onChange={handleInputChange(setLoan1)}
+                placeholder="Loan Amount"
+              />
+            </label>
+            <div className="set-percentage-group">
+              <label htmlFor="tp1" className="inline-label">
+                Set loan to:
+              </label>
+              <input
+                id="tp1"
                 type="number"
                 step="0.1"
                 value={targetPercent1}
                 onChange={handleInputChange(setTargetPercent1)}
                 className="percentage-input"
-              /> %
-              <button onClick={() => handleSetLoanByPercent(price1, targetPercent1, setLoan1)} className="apply-button">
+              />{" "}
+              %
+              <button
+                onClick={() =>
+                  handleSetLoanByPercent(price1, targetPercent1, setLoan1)
+                }
+                className="apply-button"
+              >
                 Apply %
               </button>
               <span className="calculated-percentage">
-                 (Current: {formatPercent(loanPercent1)})
+                (Current: {formatPercent(loanPercent1)})
               </span>
-           </div>
-          {/* --- End Set Loan by Percentage --- */}
-          <label>
-            Trade-in Value ($):
-            <input
-              type="number"
-              value={tradeIn1}
-              onChange={handleInputChange(setTradeIn1)}
-              placeholder="Enter Trade-in"
-            />
-          </label>
-          {/* Monthly payment is now calculated, not input */}
-        </div>
-
-        {/* --- Car 2 Inputs --- */}
-        <div className="input-group">
-           <h2>Car 2 (e.g., V)</h2>
-          <label>
-            New Car Price ($):
-            <input
-              type="number"
-              value={price2}
-              onChange={handleInputChange(setPrice2)}
-              placeholder="Enter Price"
-            />
-          </label>
-          <label>
-            Loan Amount ($):
-            <input
-              type="number"
-              value={loan2}
-              onChange={handleInputChange(setLoan2)}
-              placeholder="Enter Loan Amount"
-            />
-          </label>
-           {/* --- Set Loan by Percentage Feature --- */}
-           <div className="set-percentage-group">
-             <label htmlFor="targetPercent2Input" className="inline-label">Set loan to:</label>
-             <input
-                id="targetPercent2Input"
+            </div>
+            <label>
+              Trade-in Value ($):
+              <input
+                type="number"
+                value={tradeIn1}
+                onChange={handleInputChange(setTradeIn1)}
+                placeholder="Trade-in"
+              />
+            </label>
+          </div>
+        )}
+        {useCar2 && (
+          <div className="input-group">
+            <h2>Car 2 (e.g., V)</h2>
+            <label>
+              New Car Price ($):
+              <input
+                type="number"
+                value={price2}
+                onChange={handleInputChange(setPrice2)}
+                placeholder="Price"
+              />
+            </label>
+            <label>
+              Loan Amount ($):
+              <input
+                type="number"
+                value={loan2}
+                onChange={handleInputChange(setLoan2)}
+                placeholder="Loan Amount"
+              />
+            </label>
+            <div className="set-percentage-group">
+              <label htmlFor="tp2" className="inline-label">
+                Set loan to:
+              </label>
+              <input
+                id="tp2"
                 type="number"
                 step="0.1"
                 value={targetPercent2}
                 onChange={handleInputChange(setTargetPercent2)}
                 className="percentage-input"
-              /> %
-              <button onClick={() => handleSetLoanByPercent(price2, targetPercent2, setLoan2)} className="apply-button">
+              />{" "}
+              %
+              <button
+                onClick={() =>
+                  handleSetLoanByPercent(price2, targetPercent2, setLoan2)
+                }
+                className="apply-button"
+              >
                 Apply %
               </button>
-               <span className="calculated-percentage">
-                 (Current: {formatPercent(loanPercent2)})
-               </span>
-           </div>
-           {/* --- End Set Loan by Percentage --- */}
-          <label>
-            Trade-in Value ($):
-            <input
-              type="number"
-              value={tradeIn2}
-              onChange={handleInputChange(setTradeIn2)}
-              placeholder="Enter Trade-in"
-            />
-          </label>
-          {/* Monthly payment is now calculated, not input */}
-        </div>
+              <span className="calculated-percentage">
+                (Current: {formatPercent(loanPercent2)})
+              </span>
+            </div>
+            <label>
+              Trade-in Value ($):
+              <input
+                type="number"
+                value={tradeIn2}
+                onChange={handleInputChange(setTradeIn2)}
+                placeholder="Trade-in"
+              />
+            </label>
+          </div>
+        )}
       </div>
 
-      {/* --- Results Table --- */}
+      {/* --- Summary Table --- */}
       <h2>Calculation Summary</h2>
       <table className="results-table">
         <thead>
           <tr>
             <th>Feature</th>
-            <th>Car 1 (HYPTEC)</th>
-            <th>Car 2 (V)</th>
+            <th>{useCar1 ? "Car 1" : "–"}</th>
+            <th>{useCar2 ? "Car 2" : "–"}</th>
             <th>Totals</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>New Car Price ($)</td>
-            <td>{formatNumber(price1)}</td>
-            <td>{formatNumber(price2)}</td>
-            <td>{formatNumber(totalPrice)}</td>
+            <td>{useCar1 ? formatSummaryNumber(price1) : "–"}</td>
+            <td>{useCar2 ? formatSummaryNumber(price2) : "–"}</td>
+            <td>{formatSummaryNumber(rawTotalPrice)}</td>
           </tr>
           <tr>
             <td>Loan Amount ($)</td>
-            <td>{formatNumber(loan1)}</td>
-            <td>{formatNumber(loan2)}</td>
-            <td>{formatNumber(totalLoan)}</td>
+            <td>{useCar1 ? formatSummaryNumber(loan1) : "–"}</td>
+            <td>{useCar2 ? formatSummaryNumber(loan2) : "–"}</td>
+            <td>{formatSummaryNumber(totalLoan)}</td>
           </tr>
-           {/* --- New Row: Loan Percentage --- */}
-           <tr className="percentage-row">
-              <td>Loan as % of Price</td>
-              <td>{formatPercent(loanPercent1)}</td>
-              <td>{formatPercent(loanPercent2)}</td>
-              <td>{/* Total % isn't very meaningful, so leave blank or calculate weighted avg if needed */}</td>
-            </tr>
-           {/* --- End New Row --- */}
+          <tr className="percentage-row">
+            <td>Loan as % of Price</td>
+            <td>{useCar1 ? formatPercent(loanPercent1) : "–"}</td>
+            <td>{useCar2 ? formatPercent(loanPercent2) : "–"}</td>
+            <td></td>
+          </tr>
           <tr className="calculated-row">
-            <td>Balance Payable ($)</td>
-            <td>{formatNumber(balance1)}</td>
-            <td>{formatNumber(balance2)}</td>
-            <td>{formatNumber(totalBalance)}</td>
+            <td>
+              Downpayment Required ($)
+              <br />
+              <small>(Price - Loan)</small>
+            </td>
+            <td>{useCar1 ? formatSummaryNumber(balance1) : "–"}</td>
+            <td>{useCar2 ? formatSummaryNumber(balance2) : "–"}</td>
+            <td>
+              {formatSummaryNumber(effectiveBalance1 + effectiveBalance2)}
+            </td>
           </tr>
           <tr>
             <td>Trade-in Value ($)</td>
-            <td>{formatNumber(tradeIn1)}</td>
-            <td>{formatNumber(tradeIn2)}</td>
-            <td>{formatNumber(totalTradeIn)}</td>
+            <td>{useCar1 ? formatSummaryNumber(tradeIn1) : "–"}</td>
+            <td>{useCar2 ? formatSummaryNumber(tradeIn2) : "–"}</td>
+            <td>{formatSummaryNumber(totalTradeIn)}</td>
+          </tr>
+          <tr className="discount-row">
+            <td>Seller Discount ($)</td>
+            <td colSpan="2" style={{ textAlign: "center" }}>
+              {discountAmount > 0 ? `(Applied)` : "–"}
+            </td>
+            <td style={{ color: "green", fontWeight: "bold" }}>
+              {discountAmount > 0
+                ? `(${formatSummaryNumber(discountAmount)})`
+                : "–"}
+            </td>
           </tr>
           <tr className="calculated-row final-cash">
-            <td>Cash Upfront ($)</td>
-            {/* Add styling for negative cash if needed - basic coloring done in CSS */}
-            <td style={{ color: cash1 < 0 ? 'red' : '#28a745' }}>{formatNumber(cash1)}</td>
-            <td style={{ color: cash2 < 0 ? 'red' : '#28a745' }}>{formatNumber(cash2)}</td>
-            <td style={{ color: totalCash < 0 ? 'red' : '#28a745', fontWeight: 'bold' }}>{formatNumber(totalCash)}</td>
+            <td>
+              Cash Upfront ($)
+              <br />
+              <small>(Downpay - TradeIn - Discount)</small>
+            </td>
+            <td style={{ color: cash1 < 0 ? "red" : "#28a745" }}>
+              {useCar1 ? formatSummaryNumber(cash1) : "–"}
+            </td>
+            <td style={{ color: cash2 < 0 ? "red" : "#28a745" }}>
+              {useCar2 ? formatSummaryNumber(cash2) : "–"}
+            </td>
+            <td
+              style={{
+                color: totalCash < 0 ? "red" : "#28a745",
+                fontWeight: "bold",
+              }}
+            >
+              {formatSummaryNumber(totalCash)}
+            </td>
           </tr>
           <tr className="calculated-row">
-            <td>Est. Monthly Payment ($)</td>
-            <td>{formatNumber(monthly1)}</td>
-            <td>{formatNumber(monthly2)}</td>
-            <td>{formatNumber(totalMonthly)}</td>
+            <td>
+              Est. Monthly Payment ($)
+              <br />
+              <small>(Flat Rate)</small>
+            </td>
+            <td>{useCar1 ? formatSummaryNumber(monthly1) : "–"}</td>
+            <td>{useCar2 ? formatSummaryNumber(monthly2) : "–"}</td>
+            <td>{formatSummaryNumber(totalMonthly)}</td>
           </tr>
         </tbody>
       </table>
-    </div>
+
+      {/* --- Schedule Triggers --- */}
+      <div className="schedule-triggers">
+        {useCar1 && loan1 > 0 && loanTermYears > 0 && (
+          <button
+            onClick={handleCalculateSchedule1}
+            disabled={schedule1 && !schedule1.error}
+          >
+            {schedule1 && !schedule1.error
+              ? "Rule of 78 Shown (Car 1)"
+              : "Show Rule of 78 (Car 1)"}
+          </button>
+        )}
+        {useCar2 && loan2 > 0 && loanTermYears > 0 && (
+          <button
+            onClick={handleCalculateSchedule2}
+            disabled={schedule2 && !schedule2.error}
+          >
+            {schedule2 && !schedule2.error
+              ? "Rule of 78 Shown (Car 2)"
+              : "Show Rule of 78 (Car 2)"}
+          </button>
+        )}
+        {carSelection === "both" && totalLoan > 0 && loanTermYears > 0 && (
+          <button
+            onClick={handleCalculateCombinedSchedule}
+            disabled={scheduleCombined && !scheduleCombined.error}
+            className="combined-button"
+          >
+            {scheduleCombined && !scheduleCombined.error
+              ? "Combined Rule of 78 Shown"
+              : "Show Combined Rule of 78"}
+          </button>
+        )}
+      </div>
+
+      {/* --- Display Area --- */}
+      {/* Car 1 Schedule & Payoff */}
+      {schedule1 && !schedule1.error && (
+        <div className="amortization-schedule schedule-car1">
+          <h3>Rule of 78 Schedule (Car 1)</h3>
+          <p className="schedule-info">
+            Loan: ${formatScheduleNumber(schedule1.loanAmount)}, Term:{" "}
+            {schedule1.numberOfMonths} mo, Flat Int: $
+            {formatScheduleNumber(schedule1.totalFinanceCharge)}, M Pmt: $
+            {formatSummaryNumber(schedule1.monthlyPayment)}
+          </p>
+
+          {schedule1.numberOfMonths >= 2 && !payoffDetails1 && (
+            <div className="payoff-controls">
+              <div className="payoff-month-select">
+                <label>Payoff after month:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={schedule1.numberOfMonths - 1}
+                  value={payoffMonth1}
+                  onChange={(e) => setPayoffMonth1(Number(e.target.value))}
+                />
+              </div>
+              <button
+                onClick={() =>
+                  handleCalculatePayoff(
+                    schedule1,
+                    setPayoffDetails1,
+                    payoffMonth1
+                  )
+                }
+                className="payoff-button"
+              >
+                Calculate Payoff
+              </button>
+            </div>
+          )}
+
+          {payoffDetails1 && (
+            <button
+              onClick={() => setPayoffDetails1(null)}
+              className="hide-payoff-button"
+            >
+              Hide Payoff
+            </button>
+          )}
+          {payoffDetails1 && payoffDetails1.error && (
+            <p className="error">{payoffDetails1.error}</p>
+          )}
+          {payoffDetails1 && !payoffDetails1.error && (
+            <div className="payoff-details">
+              <h4>
+                Payoff Scenario (End of Month {payoffDetails1.totalPaidMonths})
+              </h4>
+              <div className="payoff-sections">
+                <div className="payoff-section">
+                  <h5>Payments to Date</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>
+                          Total Paid (First {payoffDetails1.totalPaidMonths}{" "}
+                          Mo):
+                        </td>
+                        <td>
+                          ${formatScheduleNumber(payoffDetails1.totalPaid)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Interest Paid:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails1.totalPaidInterest
+                          )}{" "}
+                          ({payoffDetails1.interestPaidPercentage}% of total
+                          interest)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Principal Paid:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails1.totalPaidPrincipal
+                          )}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="payoff-section">
+                  <h5>Early Payoff Option</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>Payoff Amount:</td>
+                        <td>
+                          ${formatScheduleNumber(payoffDetails1.payoffAmount)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Principal:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails1.remainingPrincipalInPayoff
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Interest:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails1.remainingInterestInPayoff
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent info">(Interest Rebate:</td>
+                        <td>
+                          ${formatScheduleNumber(payoffDetails1.interestRebate)}
+                          )
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="payoff-section">
+                  <h5>If Continuing Regular Payments</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>Total Remaining Payments:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails1.remainingTotalIfContinued
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Principal:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails1.remainingPrincipalIfContinued
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Interest:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails1.remainingInterestIfContinued
+                          )}{" "}
+                          ({payoffDetails1.interestRemainingPercentage}% of
+                          total interest)
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="payoff-section full-width">
+                  <h5>Savings Analysis</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>Total Payment Savings:</td>
+                        <td>
+                          ${formatScheduleNumber(payoffDetails1.totalSavings)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Interest Savings:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(payoffDetails1.interestSavings)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="chart-section">
+                <h5>Payment Breakdown Over Loan Term</h5>
+                <PayoffChart chartData={payoffDetails1.chartData} />
+              </div>
+            </div>
+          )}
+          <button
+            onClick={() => {
+              setSchedule1(null);
+              setPayoffDetails1(null);
+            }}
+            className="hide-button"
+          >
+            Hide Car 1
+          </button>
+          <table className="results-table schedule-table">
+            <thead>
+              <tr>
+                <th>Mo</th>
+                <th>Start Bal</th>
+                <th>Interest</th>
+                <th>Principal</th>
+                <th>End Bal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {schedule1.schedule.map((r) => (
+                <tr key={`s1-${r.month}`}>
+                  <td>{r.month}</td>
+                  <td>{formatScheduleNumber(r.startBalance)}</td>
+                  <td>{formatScheduleNumber(r.interest)}</td>
+                  <td>{formatScheduleNumber(r.principal)}</td>
+                  <td>{formatScheduleNumber(r.endBalance)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan="2">Sum-of-Digits:</td>
+                <td>{schedule1.sumOfDigits}</td>
+                <td>Total Fin Chg:</td>
+                <td>${formatScheduleNumber(schedule1.totalFinanceCharge)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+      {schedule1 && schedule1.error && (
+        <div className="schedule-error">
+          <p>Err(Car 1): {schedule1.error}</p>
+          <button onClick={() => setSchedule1(null)} className="hide-button">
+            X
+          </button>
+        </div>
+      )}
+
+      {/* Car 2 Schedule & Payoff */}
+      {schedule2 && !schedule2.error && (
+        <div className="amortization-schedule schedule-car2">
+          <h3>Rule of 78 Schedule (Car 2)</h3>
+          <p className="schedule-info">
+            Loan: ${formatScheduleNumber(schedule2.loanAmount)}, Term:{" "}
+            {schedule2.numberOfMonths} mo, Flat Int: $
+            {formatScheduleNumber(schedule2.totalFinanceCharge)}, M Pmt: $
+            {formatSummaryNumber(schedule2.monthlyPayment)}
+          </p>
+
+          {schedule2.numberOfMonths >= 2 && !payoffDetails2 && (
+            <div className="payoff-controls">
+              <div className="payoff-month-select">
+                <label>Payoff after month:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={schedule2.numberOfMonths - 1}
+                  value={payoffMonth2}
+                  onChange={(e) => setPayoffMonth2(Number(e.target.value))}
+                />
+              </div>
+              <button
+                onClick={() =>
+                  handleCalculatePayoff(
+                    schedule2,
+                    setPayoffDetails2,
+                    payoffMonth2
+                  )
+                }
+                className="payoff-button"
+              >
+                Calculate Payoff
+              </button>
+            </div>
+          )}
+
+          {payoffDetails2 && (
+            <button
+              onClick={() => setPayoffDetails2(null)}
+              className="hide-payoff-button"
+            >
+              Hide Payoff
+            </button>
+          )}
+          {payoffDetails2 && payoffDetails2.error && (
+            <p className="error">{payoffDetails2.error}</p>
+          )}
+          {payoffDetails2 && !payoffDetails2.error && (
+            <div className="payoff-details">
+              <h4>
+                Payoff Scenario (End of Month {payoffDetails2.totalPaidMonths})
+              </h4>
+              <div className="payoff-sections">
+                <div className="payoff-section">
+                  <h5>Payments to Date</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>
+                          Total Paid (First {payoffDetails2.totalPaidMonths}{" "}
+                          Mo):
+                        </td>
+                        <td>
+                          ${formatScheduleNumber(payoffDetails2.totalPaid)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Interest Paid:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails2.totalPaidInterest
+                          )}{" "}
+                          ({payoffDetails2.interestPaidPercentage}% of total
+                          interest)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Principal Paid:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails2.totalPaidPrincipal
+                          )}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="payoff-section">
+                  <h5>Early Payoff Option</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>Payoff Amount:</td>
+                        <td>
+                          ${formatScheduleNumber(payoffDetails2.payoffAmount)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Principal:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails2.remainingPrincipalInPayoff
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Interest:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails2.remainingInterestInPayoff
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent info">(Interest Rebate:</td>
+                        <td>
+                          ${formatScheduleNumber(payoffDetails2.interestRebate)}
+                          )
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="payoff-section">
+                  <h5>If Continuing Regular Payments</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>Total Remaining Payments:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails2.remainingTotalIfContinued
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Principal:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails2.remainingPrincipalIfContinued
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Interest:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetails2.remainingInterestIfContinued
+                          )}{" "}
+                          ({payoffDetails2.interestRemainingPercentage}% of
+                          total interest)
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="payoff-section full-width">
+                  <h5>Savings Analysis</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>Total Payment Savings:</td>
+                        <td>
+                          ${formatScheduleNumber(payoffDetails2.totalSavings)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Interest Savings:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(payoffDetails2.interestSavings)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="chart-section">
+                <h5>Payment Breakdown Over Loan Term</h5>
+                <PayoffChart chartData={payoffDetails2.chartData} />
+              </div>
+            </div>
+          )}
+          <button
+            onClick={() => {
+              setSchedule2(null);
+              setPayoffDetails2(null);
+            }}
+            className="hide-button"
+          >
+            Hide Car 2
+          </button>
+          <table className="results-table schedule-table">
+            <thead>
+              <tr>
+                <th>Mo</th>
+                <th>Start Bal</th>
+                <th>Interest</th>
+                <th>Principal</th>
+                <th>End Bal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {schedule2.schedule.map((r) => (
+                <tr key={`s2-${r.month}`}>
+                  <td>{r.month}</td>
+                  <td>{formatScheduleNumber(r.startBalance)}</td>
+                  <td>{formatScheduleNumber(r.interest)}</td>
+                  <td>{formatScheduleNumber(r.principal)}</td>
+                  <td>{formatScheduleNumber(r.endBalance)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan="2">Sum-of-Digits:</td>
+                <td>{schedule2.sumOfDigits}</td>
+                <td>Total Fin Chg:</td>
+                <td>${formatScheduleNumber(schedule2.totalFinanceCharge)}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+      {schedule2 && schedule2.error && (
+        <div className="schedule-error">
+          <p>Err(Car 2): {schedule2.error}</p>
+          <button onClick={() => setSchedule2(null)} className="hide-button">
+            X
+          </button>
+        </div>
+      )}
+
+      {/* Combined Schedule */}
+      {scheduleCombined && !scheduleCombined.error && (
+        <div className="amortization-schedule schedule-combined">
+          <h3>Combined Rule of 78 Schedule</h3>
+          <p className="schedule-info">
+            Total Loan: ${formatScheduleNumber(scheduleCombined.loanAmount)},
+            Term: {scheduleCombined.numberOfMonths} mo, Flat Int: $
+            {formatScheduleNumber(scheduleCombined.totalFinanceCharge)}, Total M
+            Pmt: ${formatSummaryNumber(scheduleCombined.monthlyPayment)}
+          </p>
+
+          {scheduleCombined.numberOfMonths >= 2 && !payoffDetailsCombined && (
+            <div className="payoff-controls">
+              <div className="payoff-month-select">
+                <label>Payoff after month:</label>
+                <input
+                  type="number"
+                  min="1"
+                  max={scheduleCombined.numberOfMonths - 1}
+                  value={payoffMonthCombined}
+                  onChange={(e) =>
+                    setPayoffMonthCombined(Number(e.target.value))
+                  }
+                />
+              </div>
+              <button
+                onClick={() =>
+                  handleCalculatePayoff(
+                    scheduleCombined,
+                    setPayoffDetailsCombined,
+                    payoffMonthCombined
+                  )
+                }
+                className="payoff-button"
+              >
+                Calculate Payoff
+              </button>
+            </div>
+          )}
+
+          {payoffDetailsCombined && (
+            <button
+              onClick={() => setPayoffDetailsCombined(null)}
+              className="hide-payoff-button"
+            >
+              Hide Payoff
+            </button>
+          )}
+          {payoffDetailsCombined && payoffDetailsCombined.error && (
+            <p className="error">{payoffDetailsCombined.error}</p>
+          )}
+          {payoffDetailsCombined && !payoffDetailsCombined.error && (
+            <div className="payoff-details">
+              <h4>
+                Payoff Scenario (End of Month{" "}
+                {payoffDetailsCombined.totalPaidMonths})
+              </h4>
+              <div className="payoff-sections">
+                <div className="payoff-section">
+                  <h5>Payments to Date</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>
+                          Total Paid (First{" "}
+                          {payoffDetailsCombined.totalPaidMonths} Mo):
+                        </td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.totalPaid
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Interest Paid:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.totalPaidInterest
+                          )}{" "}
+                          ({payoffDetailsCombined.interestPaidPercentage}% of
+                          total interest)
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Principal Paid:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.totalPaidPrincipal
+                          )}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="payoff-section">
+                  <h5>Early Payoff Option</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>Payoff Amount:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.payoffAmount
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Principal:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.remainingPrincipalInPayoff
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Interest:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.remainingInterestInPayoff
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent info">(Interest Rebate:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.interestRebate
+                          )}
+                          )
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="payoff-section">
+                  <h5>If Continuing Regular Payments</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>Total Remaining Payments:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.remainingTotalIfContinued
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Principal:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.remainingPrincipalIfContinued
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="indent">Remaining Interest:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.remainingInterestIfContinued
+                          )}{" "}
+                          ({payoffDetailsCombined.interestRemainingPercentage}%
+                          of total interest)
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="payoff-section full-width">
+                  <h5>Savings Analysis</h5>
+                  <table>
+                    <tbody>
+                      <tr>
+                        <td>Total Payment Savings:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.totalSavings
+                          )}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td>Interest Savings:</td>
+                        <td>
+                          $
+                          {formatScheduleNumber(
+                            payoffDetailsCombined.interestSavings
+                          )}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="chart-section">
+                <h5>Payment Breakdown Over Loan Term</h5>
+                <PayoffChart chartData={payoffDetailsCombined.chartData} />
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              setScheduleCombined(null);
+              setPayoffDetailsCombined(null);
+            }}
+            className="hide-button"
+          >
+            Hide Combined
+          </button>
+          <table className="results-table schedule-table">
+            <thead>
+              <tr>
+                <th>Mo</th>
+                <th>Start Bal</th>
+                <th>Interest</th>
+                <th>Principal</th>
+                <th>End Bal</th>
+              </tr>
+            </thead>
+            <tbody>
+              {scheduleCombined.schedule.map((r) => (
+                <tr key={`sc-${r.month}`}>
+                  <td>{r.month}</td>
+                  <td>{formatScheduleNumber(r.startBalance)}</td>
+                  <td>{formatScheduleNumber(r.interest)}</td>
+                  <td>{formatScheduleNumber(r.principal)}</td>
+                  <td>{formatScheduleNumber(r.endBalance)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr>
+                <td colSpan="2">Sum-of-Digits:</td>
+                <td>{scheduleCombined.sumOfDigits}</td>
+                <td>Total Fin Chg:</td>
+                <td>
+                  ${formatScheduleNumber(scheduleCombined.totalFinanceCharge)}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+      {scheduleCombined && scheduleCombined.error && (
+        <div className="schedule-error">
+          <p>Err(Combined): {scheduleCombined.error}</p>
+          <button
+            onClick={() => setScheduleCombined(null)}
+            className="hide-button"
+          >
+            X
+          </button>
+        </div>
+      )}
+    </div> // End App
   );
 }
 
