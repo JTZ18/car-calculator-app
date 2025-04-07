@@ -515,3 +515,227 @@ input[type=number] { -moz-appearance: textfield; }
 
 /* General Error Class (e.g., for payoff) */
 .error { color: #dc3545; font-weight: bold; font-size: 0.9em; margin-top: 5px; }
+
+/* --- Configuration Comparison Styles --- */
+
+/* Configuration Controls */
+.configuration-controls {
+  margin-bottom: 25px;
+}
+
+.comparison-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.comparison-buttons {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.save-config-button, .compare-button {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.95em;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.save-config-button.config-a {
+  background-color: #28a745;
+  color: white;
+}
+
+.save-config-button.config-b {
+  background-color: #007bff;
+  color: white;
+}
+
+.save-config-button:hover {
+  filter: brightness(90%);
+}
+
+.compare-button {
+  background-color: #6c757d;
+  color: white;
+  font-weight: bold;
+}
+
+.compare-button:hover:not(:disabled) {
+  background-color: #5a6268;
+}
+
+.compare-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.config-status {
+  display: flex;
+  gap: 20px;
+}
+
+.config-indicator {
+  padding: 5px 10px;
+  border-radius: 4px;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  font-size: 0.9em;
+  color: #6c757d;
+}
+
+.config-indicator.saved {
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+  color: #155724;
+}
+
+/* Comparison Container */
+.comparison-container {
+  margin-top: 40px;
+  padding: 20px;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background-color: #fff;
+  position: relative;
+}
+
+.hide-comparison-button {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  padding: 7px 14px;
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.85em;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.hide-comparison-button:hover {
+  background-color: #c82333;
+}
+
+/* Config Comparison Component */
+.config-comparison {
+  margin-top: 20px;
+}
+
+.config-comparison h3 {
+  text-align: center;
+  font-size: 1.3em;
+  margin-bottom: 10px;
+}
+
+.comparison-description {
+  text-align: center;
+  font-size: 0.9em;
+  color: #6c757d;
+  margin-bottom: 20px;
+}
+
+.comparison-columns {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 15px;
+  border-bottom: 2px solid #f8f9fa;
+  padding-bottom: 10px;
+}
+
+.comparison-column {
+  flex: 1;
+  text-align: center;
+}
+
+.comparison-column h4 {
+  margin: 0;
+  font-size: 1em;
+  color: #495057;
+}
+
+.comparison-section {
+  margin-bottom: 25px;
+  border: 1px solid #e9ecef;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.comparison-section h5 {
+  margin: 0;
+  padding: 10px 15px;
+  background-color: #f8f9fa;
+  font-size: 1em;
+  color: #495057;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.comparison-row {
+  display: flex;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.comparison-row:last-child {
+  border-bottom: none;
+}
+
+.comparison-row.calculated-row {
+  background-color: #f8f9fa;
+}
+
+.comparison-row.highlight-row {
+  background-color: #e9f7ef;
+  font-weight: bold;
+}
+
+.comparison-label {
+  flex: 2;
+  padding: 10px 15px;
+  font-size: 0.9em;
+  color: #495057;
+  border-right: 1px solid #f1f1f1;
+}
+
+.comparison-value, .comparison-delta {
+  flex: 1;
+  padding: 10px 15px;
+  font-size: 0.9em;
+  text-align: center;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .comparison-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .comparison-buttons {
+    justify-content: center;
+  }
+  
+  .config-status {
+    justify-content: center;
+  }
+  
+  .comparison-row {
+    flex-wrap: wrap;
+  }
+  
+  .comparison-label {
+    flex: 100%;
+    border-right: none;
+    border-bottom: 1px solid #f1f1f1;
+    font-weight: bold;
+  }
+  
+  .comparison-value, .comparison-delta {
+    flex: 1;
+  }
+}

@@ -13,6 +13,329 @@ import {
 import annotationPlugin from "chartjs-plugin-annotation";
 import "./App.css";
 
+// Configuration Comparison Component
+const ConfigComparison = ({ configA, configB }) => {
+  if (!configA || !configB) return null;
+
+  // Helper function to calculate delta
+  const calculateDelta = (valueA, valueB) => {
+    const numA = Number(valueA) || 0;
+    const numB = Number(valueB) || 0;
+    return numB - numA;
+  };
+
+  // Helper function to calculate percentage delta
+  const calculatePercentDelta = (valueA, valueB) => {
+    const numA = Number(valueA) || 0;
+    const numB = Number(valueB) || 0;
+
+    if (numA === 0) return numB === 0 ? 0 : 100; // Handle division by zero
+    return ((numB - numA) / numA) * 100;
+  };
+
+  // Format percentage delta with + or - sign
+  const formatPercentDelta = (percentDelta) => {
+    if (isNaN(percentDelta) || !isFinite(percentDelta)) return "N/A";
+    const sign = percentDelta >= 0 ? "+" : "";
+    return `${sign}${percentDelta.toFixed(1)}%`;
+  };
+
+  // Format number delta with + or - sign
+  const formatDelta = (delta, isCurrency = true) => {
+    if (isNaN(delta) || !isFinite(delta)) return "N/A";
+    const sign = delta >= 0 ? "+" : "";
+    if (isCurrency) {
+      return `${sign}$${Math.abs(delta).toLocaleString("en-US", {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      })}`;
+    }
+    return `${sign}${delta.toFixed(2)}`;
+  };
+
+  // Style based on value comparison (green for increase, red for decrease)
+  const getDeltaStyle = (delta, inverseColor = false) => {
+    if (delta === 0) return { color: "#6c757d" }; // Grey for no change
+
+    // Determine if it's positive or negative
+    const isPositive = delta > 0;
+
+    // If inverseColor is true, we flip the colors (e.g., for costs, increase = red)
+    const goodColor = inverseColor ? "#dc3545" : "#28a745"; // Green or red
+    const badColor = inverseColor ? "#28a745" : "#dc3545"; // Red or green
+
+    return {
+      color: isPositive ? goodColor : badColor,
+      fontWeight: "bold"
+    };
+  };
+
+  return (
+    <div className="config-comparison">
+      <h3>Configuration Comparison</h3>
+      <p className="comparison-description">
+        Showing changes from Configuration A (left) to Configuration B (right).
+        Green indicates beneficial changes, red indicates adverse changes.
+      </p>
+
+      <div className="comparison-columns">
+        <div className="comparison-column">
+          <h4>Configuration A</h4>
+        </div>
+        <div className="comparison-column">
+          <h4>Configuration B</h4>
+        </div>
+        <div className="comparison-column">
+          <h4>Absolute Δ</h4>
+        </div>
+        <div className="comparison-column">
+          <h4>Percentage Δ</h4>
+        </div>
+      </div>
+
+      <div className="comparison-section">
+        <h5>Loan Parameters</h5>
+        <div className="comparison-row">
+          <div className="comparison-label">Interest Rate (%)</div>
+          <div className="comparison-value">{configA.interestRate}</div>
+          <div className="comparison-value">{configB.interestRate}</div>
+          <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.interestRate, configB.interestRate), true)}>
+            {formatDelta(calculateDelta(configA.interestRate, configB.interestRate), false)}
+          </div>
+          <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.interestRate, configB.interestRate), true)}>
+            {formatPercentDelta(calculatePercentDelta(configA.interestRate, configB.interestRate))}
+          </div>
+        </div>
+        <div className="comparison-row">
+          <div className="comparison-label">Loan Term (Years)</div>
+          <div className="comparison-value">{configA.loanTermYears}</div>
+          <div className="comparison-value">{configB.loanTermYears}</div>
+          <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.loanTermYears, configB.loanTermYears), false)}>
+            {formatDelta(calculateDelta(configA.loanTermYears, configB.loanTermYears), false)}
+          </div>
+          <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.loanTermYears, configB.loanTermYears), false)}>
+            {formatPercentDelta(calculatePercentDelta(configA.loanTermYears, configB.loanTermYears))}
+          </div>
+        </div>
+        <div className="comparison-row">
+          <div className="comparison-label">Seller Discount ($)</div>
+          <div className="comparison-value">{configA.discountAmount}</div>
+          <div className="comparison-value">{configB.discountAmount}</div>
+          <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.discountAmount, configB.discountAmount), false)}>
+            {formatDelta(calculateDelta(configA.discountAmount, configB.discountAmount))}
+          </div>
+          <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.discountAmount, configB.discountAmount), false)}>
+            {formatPercentDelta(calculatePercentDelta(configA.discountAmount, configB.discountAmount))}
+          </div>
+        </div>
+      </div>
+
+      {configA.useCar1 && configB.useCar1 && (
+        <div className="comparison-section">
+          <h5>Car 1 Parameters</h5>
+          <div className="comparison-row">
+            <div className="comparison-label">Car 1 Price ($)</div>
+            <div className="comparison-value">{configA.price1}</div>
+            <div className="comparison-value">{configB.price1}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.price1, configB.price1), true)}>
+              {formatDelta(calculateDelta(configA.price1, configB.price1))}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.price1, configB.price1), true)}>
+              {formatPercentDelta(calculatePercentDelta(configA.price1, configB.price1))}
+            </div>
+          </div>
+          <div className="comparison-row">
+            <div className="comparison-label">Car 1 Loan Amount ($)</div>
+            <div className="comparison-value">{configA.loan1}</div>
+            <div className="comparison-value">{configB.loan1}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.loan1, configB.loan1), true)}>
+              {formatDelta(calculateDelta(configA.loan1, configB.loan1))}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.loan1, configB.loan1), true)}>
+              {formatPercentDelta(calculatePercentDelta(configA.loan1, configB.loan1))}
+            </div>
+          </div>
+          <div className="comparison-row">
+            <div className="comparison-label">Car 1 Trade-in Value ($)</div>
+            <div className="comparison-value">{configA.tradeIn1}</div>
+            <div className="comparison-value">{configB.tradeIn1}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.tradeIn1, configB.tradeIn1), false)}>
+              {formatDelta(calculateDelta(configA.tradeIn1, configB.tradeIn1))}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.tradeIn1, configB.tradeIn1), false)}>
+              {formatPercentDelta(calculatePercentDelta(configA.tradeIn1, configB.tradeIn1))}
+            </div>
+          </div>
+          <div className="comparison-row">
+            <div className="comparison-label">Car 1 Target Percentage (%)</div>
+            <div className="comparison-value">{configA.targetPercent1}</div>
+            <div className="comparison-value">{configB.targetPercent1}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.targetPercent1, configB.targetPercent1), false)}>
+              {formatDelta(calculateDelta(configA.targetPercent1, configB.targetPercent1), false)}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.targetPercent1, configB.targetPercent1), false)}>
+              {formatPercentDelta(calculatePercentDelta(configA.targetPercent1, configB.targetPercent1))}
+            </div>
+          </div>
+          <div className="comparison-row calculated-row">
+            <div className="comparison-label">Car 1 Monthly Payment ($)</div>
+            <div className="comparison-value">{configA.monthly1}</div>
+            <div className="comparison-value">{configB.monthly1}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.monthly1, configB.monthly1), true)}>
+              {formatDelta(calculateDelta(configA.monthly1, configB.monthly1))}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.monthly1, configB.monthly1), true)}>
+              {formatPercentDelta(calculatePercentDelta(configA.monthly1, configB.monthly1))}
+            </div>
+          </div>
+          <div className="comparison-row calculated-row">
+            <div className="comparison-label">Car 1 Cash Required ($)</div>
+            <div className="comparison-value">{configA.cash1}</div>
+            <div className="comparison-value">{configB.cash1}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.cash1, configB.cash1), true)}>
+              {formatDelta(calculateDelta(configA.cash1, configB.cash1))}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.cash1, configB.cash1), true)}>
+              {formatPercentDelta(calculatePercentDelta(configA.cash1, configB.cash1))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {configA.useCar2 && configB.useCar2 && (
+        <div className="comparison-section">
+          <h5>Car 2 Parameters</h5>
+          <div className="comparison-row">
+            <div className="comparison-label">Car 2 Price ($)</div>
+            <div className="comparison-value">{configA.price2}</div>
+            <div className="comparison-value">{configB.price2}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.price2, configB.price2), true)}>
+              {formatDelta(calculateDelta(configA.price2, configB.price2))}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.price2, configB.price2), true)}>
+              {formatPercentDelta(calculatePercentDelta(configA.price2, configB.price2))}
+            </div>
+          </div>
+          <div className="comparison-row">
+            <div className="comparison-label">Car 2 Loan Amount ($)</div>
+            <div className="comparison-value">{configA.loan2}</div>
+            <div className="comparison-value">{configB.loan2}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.loan2, configB.loan2), true)}>
+              {formatDelta(calculateDelta(configA.loan2, configB.loan2))}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.loan2, configB.loan2), true)}>
+              {formatPercentDelta(calculatePercentDelta(configA.loan2, configB.loan2))}
+            </div>
+          </div>
+          <div className="comparison-row">
+            <div className="comparison-label">Car 2 Trade-in Value ($)</div>
+            <div className="comparison-value">{configA.tradeIn2}</div>
+            <div className="comparison-value">{configB.tradeIn2}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.tradeIn2, configB.tradeIn2), false)}>
+              {formatDelta(calculateDelta(configA.tradeIn2, configB.tradeIn2))}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.tradeIn2, configB.tradeIn2), false)}>
+              {formatPercentDelta(calculatePercentDelta(configA.tradeIn2, configB.tradeIn2))}
+            </div>
+          </div>
+          <div className="comparison-row">
+            <div className="comparison-label">Car 2 Target Percentage (%)</div>
+            <div className="comparison-value">{configA.targetPercent2}</div>
+            <div className="comparison-value">{configB.targetPercent2}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.targetPercent2, configB.targetPercent2), false)}>
+              {formatDelta(calculateDelta(configA.targetPercent2, configB.targetPercent2), false)}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.targetPercent2, configB.targetPercent2), false)}>
+              {formatPercentDelta(calculatePercentDelta(configA.targetPercent2, configB.targetPercent2))}
+            </div>
+          </div>
+          <div className="comparison-row calculated-row">
+            <div className="comparison-label">Car 2 Monthly Payment ($)</div>
+            <div className="comparison-value">{configA.monthly2}</div>
+            <div className="comparison-value">{configB.monthly2}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.monthly2, configB.monthly2), true)}>
+              {formatDelta(calculateDelta(configA.monthly2, configB.monthly2))}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.monthly2, configB.monthly2), true)}>
+              {formatPercentDelta(calculatePercentDelta(configA.monthly2, configB.monthly2))}
+            </div>
+          </div>
+          <div className="comparison-row calculated-row">
+            <div className="comparison-label">Car 2 Cash Required ($)</div>
+            <div className="comparison-value">{configA.cash2}</div>
+            <div className="comparison-value">{configB.cash2}</div>
+            <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.cash2, configB.cash2), true)}>
+              {formatDelta(calculateDelta(configA.cash2, configB.cash2))}
+            </div>
+            <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.cash2, configB.cash2), true)}>
+              {formatPercentDelta(calculatePercentDelta(configA.cash2, configB.cash2))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="comparison-section">
+        <h5>Total Summary Comparison</h5>
+        <div className="comparison-row">
+          <div className="comparison-label">Total Price ($)</div>
+          <div className="comparison-value">{configA.totalPrice}</div>
+          <div className="comparison-value">{configB.totalPrice}</div>
+          <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.totalPrice, configB.totalPrice), true)}>
+            {formatDelta(calculateDelta(configA.totalPrice, configB.totalPrice))}
+          </div>
+          <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.totalPrice, configB.totalPrice), true)}>
+            {formatPercentDelta(calculatePercentDelta(configA.totalPrice, configB.totalPrice))}
+          </div>
+        </div>
+        <div className="comparison-row">
+          <div className="comparison-label">Total Loan Amount ($)</div>
+          <div className="comparison-value">{configA.totalLoan}</div>
+          <div className="comparison-value">{configB.totalLoan}</div>
+          <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.totalLoan, configB.totalLoan), true)}>
+            {formatDelta(calculateDelta(configA.totalLoan, configB.totalLoan))}
+          </div>
+          <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.totalLoan, configB.totalLoan), true)}>
+            {formatPercentDelta(calculatePercentDelta(configA.totalLoan, configB.totalLoan))}
+          </div>
+        </div>
+        <div className="comparison-row">
+          <div className="comparison-label">Total Trade-in Value ($)</div>
+          <div className="comparison-value">{configA.totalTradeIn}</div>
+          <div className="comparison-value">{configB.totalTradeIn}</div>
+          <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.totalTradeIn, configB.totalTradeIn), false)}>
+            {formatDelta(calculateDelta(configA.totalTradeIn, configB.totalTradeIn))}
+          </div>
+          <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.totalTradeIn, configB.totalTradeIn), false)}>
+            {formatPercentDelta(calculatePercentDelta(configA.totalTradeIn, configB.totalTradeIn))}
+          </div>
+        </div>
+        <div className="comparison-row highlight-row">
+          <div className="comparison-label">Total Monthly Payment ($)</div>
+          <div className="comparison-value">{configA.totalMonthly}</div>
+          <div className="comparison-value">{configB.totalMonthly}</div>
+          <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.totalMonthly, configB.totalMonthly), true)}>
+            {formatDelta(calculateDelta(configA.totalMonthly, configB.totalMonthly))}
+          </div>
+          <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.totalMonthly, configB.totalMonthly), true)}>
+            {formatPercentDelta(calculatePercentDelta(configA.totalMonthly, configB.totalMonthly))}
+          </div>
+        </div>
+        <div className="comparison-row highlight-row">
+          <div className="comparison-label">Total Cash Required ($)</div>
+          <div className="comparison-value">{configA.totalCash}</div>
+          <div className="comparison-value">{configB.totalCash}</div>
+          <div className="comparison-delta" style={getDeltaStyle(calculateDelta(configA.totalCash, configB.totalCash), true)}>
+            {formatDelta(calculateDelta(configA.totalCash, configB.totalCash))}
+          </div>
+          <div className="comparison-delta" style={getDeltaStyle(calculatePercentDelta(configA.totalCash, configB.totalCash), true)}>
+            {formatPercentDelta(calculatePercentDelta(configA.totalCash, configB.totalCash))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Register Chart.js components
 ChartJS.register(
   CategoryScale,
@@ -305,7 +628,7 @@ const PayoffChart = ({ chartData }) => {
 
   // Only include selected datasets
   const datasets = [];
-  
+
   if (selectedDatasets.principal) {
     datasets.push({
       label: "Principal Payment",
@@ -314,7 +637,7 @@ const PayoffChart = ({ chartData }) => {
       backgroundColor: "rgba(53, 162, 235, 0.5)",
     });
   }
-  
+
   if (selectedDatasets.interest) {
     datasets.push({
       label: "Interest Payment",
@@ -323,7 +646,7 @@ const PayoffChart = ({ chartData }) => {
       backgroundColor: "rgba(255, 99, 132, 0.5)",
     });
   }
-  
+
   if (selectedDatasets.balance) {
     datasets.push({
       label: "Remaining Balance",
@@ -399,6 +722,11 @@ function App() {
   const [payoffMonth1, setPayoffMonth1] = useState(12);
   const [payoffMonth2, setPayoffMonth2] = useState(12);
   const [payoffMonthCombined, setPayoffMonthCombined] = useState(12);
+
+  // --- New configuration comparison state ---
+  const [configA, setConfigA] = useState(null);
+  const [configB, setConfigB] = useState(null);
+  const [showConfigComparison, setShowConfigComparison] = useState(false);
 
   // --- Calculation Functions ---
   const calculateMonthlyPaymentFlatRate = (
@@ -493,17 +821,17 @@ function App() {
         totalFlatInterest,
         monthly1
       );
-      
+
       if (result && !result.error) {
         setSchedule1(result);
-        
+
         // If there was a payoff calculation, update it too
         if (payoffDetails1 && !payoffDetails1.error) {
           handleCalculatePayoff(result, setPayoffDetails1, payoffMonth1);
         }
       }
     }
-    
+
     // Check if we need to update schedule2
     if (schedule2 && !schedule2.error && useCar2) {
       const months = (loanTermYears || 0) * 12;
@@ -518,17 +846,17 @@ function App() {
         totalFlatInterest,
         monthly2
       );
-      
+
       if (result && !result.error) {
         setSchedule2(result);
-        
+
         // If there was a payoff calculation, update it too
         if (payoffDetails2 && !payoffDetails2.error) {
           handleCalculatePayoff(result, setPayoffDetails2, payoffMonth2);
         }
       }
     }
-    
+
     // Check if we need to update combined schedule
     if (scheduleCombined && !scheduleCombined.error && carSelection === "both") {
       const months = (loanTermYears || 0) * 12;
@@ -543,10 +871,10 @@ function App() {
         totalCombinedFlatInterest,
         totalMonthly
       );
-      
+
       if (result && !result.error) {
         setScheduleCombined(result);
-        
+
         // If there was a payoff calculation, update it too
         if (payoffDetailsCombined && !payoffDetailsCombined.error) {
           handleCalculatePayoff(result, setPayoffDetailsCombined, payoffMonthCombined);
@@ -576,6 +904,78 @@ function App() {
     if (event.target.value !== "both") {
       setScheduleCombined(null);
     }
+  };
+
+  // --- Configuration saving and comparison functions ---
+  const getCurrentConfig = () => {
+    return {
+      // General settings
+      carSelection,
+      discountAmount,
+      interestRate,
+      loanTermYears,
+
+      // Car 1 settings
+      price1,
+      loan1,
+      tradeIn1,
+      targetPercent1,
+      loanPercent1,
+      balance1,
+      cash1,
+      monthly1,
+
+      // Car 2 settings
+      price2,
+      loan2,
+      tradeIn2,
+      targetPercent2,
+      loanPercent2,
+      balance2,
+      cash2,
+      monthly2,
+
+      // Usage flags
+      useCar1: carSelection === "car1" || carSelection === "both",
+      useCar2: carSelection === "car2" || carSelection === "both",
+
+      // Totals
+      totalPrice,
+      totalLoan,
+      totalTradeIn,
+      totalMonthly,
+      totalCash
+    };
+  };
+
+  const handleSaveConfigA = () => {
+    setConfigA(getCurrentConfig());
+    alert("Configuration A saved!");
+  };
+
+  const handleSaveConfigB = () => {
+    setConfigB(getCurrentConfig());
+    alert("Configuration B saved!");
+  };
+
+  const handleCompareConfigs = () => {
+    if (!configA || !configB) {
+      alert("Please save both configurations before comparing.");
+      return;
+    }
+    setShowConfigComparison(true);
+
+    // Clear any existing schedules for clarity
+    setSchedule1(null);
+    setSchedule2(null);
+    setScheduleCombined(null);
+    setPayoffDetails1(null);
+    setPayoffDetails2(null);
+    setPayoffDetailsCombined(null);
+  };
+
+  const handleHideComparison = () => {
+    setShowConfigComparison(false);
   };
   const handleCalculateSchedule1 = () => {
     setPayoffDetails1(null);
@@ -779,6 +1179,45 @@ function App() {
   return (
     <div className="App">
       <h1>Electric Vehicle Purchase Calculator</h1>
+      
+      {/* --- Configuration Comparison Controls --- */}
+      <div className="config-section configuration-controls">
+        <h3>Configuration Comparison</h3>
+        <div className="comparison-controls">
+          <div className="comparison-buttons">
+            <button 
+              className="save-config-button config-a" 
+              onClick={handleSaveConfigA}
+              title="Save current inputs as Configuration A"
+            >
+              Save as Config A
+            </button>
+            <button 
+              className="save-config-button config-b" 
+              onClick={handleSaveConfigB}
+              title="Save current inputs as Configuration B"
+            >
+              Save as Config B
+            </button>
+            <button 
+              className="compare-button" 
+              onClick={handleCompareConfigs}
+              disabled={!configA || !configB}
+              title="Compare the two saved configurations"
+            >
+              Compare Configurations
+            </button>
+          </div>
+          <div className="config-status">
+            <div className={`config-indicator ${configA ? 'saved' : ''}`}>
+              Config A: {configA ? 'Saved' : 'Not Saved'}
+            </div>
+            <div className={`config-indicator ${configB ? 'saved' : ''}`}>
+              Config B: {configB ? 'Saved' : 'Not Saved'}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* --- Config Sections --- */}
       <div className="config-section car-selection">
@@ -1860,6 +2299,20 @@ function App() {
           >
             X
           </button>
+        </div>
+      )}
+
+      {/* --- Configuration Comparison Display --- */}
+      {showConfigComparison && (
+        <div className="comparison-container">
+          <h2>Configuration Comparison</h2>
+          <button
+            onClick={handleHideComparison}
+            className="hide-comparison-button"
+          >
+            Hide Comparison
+          </button>
+          <ConfigComparison configA={configA} configB={configB} />
         </div>
       )}
     </div> // End App
