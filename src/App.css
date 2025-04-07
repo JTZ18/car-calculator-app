@@ -410,6 +410,62 @@ input[type=number] { -moz-appearance: textfield; }
   padding-bottom: 10px;
 }
 
+/* Chart controls */
+.chart-control-panel {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 15px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+.chart-checkboxes {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.chart-checkboxes label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+}
+
+.chart-checkboxes label:hover {
+  background-color: #e9ecef;
+}
+
+.chart-checkboxes input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Color indicators for legend */
+.principal-color {
+  position: relative;
+  padding-left: 5px;
+  border-left: 3px solid rgba(53, 162, 235, 0.8);
+}
+
+.interest-color {
+  position: relative;
+  padding-left: 5px;
+  border-left: 3px solid rgba(255, 99, 132, 0.8);
+}
+
+.balance-color {
+  position: relative;
+  padding-left: 5px;
+  border-left: 3px solid rgba(75, 192, 192, 0.8);
+}
+
 .chart-container {
   height: 350px;
   position: relative;

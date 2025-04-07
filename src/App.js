@@ -214,7 +214,20 @@ const calculateRule78ScheduleInternal = (
 
 // PayoffChart component for visualizing payment breakdown
 const PayoffChart = ({ chartData }) => {
+  const [selectedDatasets, setSelectedDatasets] = useState({
+    principal: true,
+    interest: true,
+    balance: true,
+  });
+
   if (!chartData) return null;
+
+  const handleDatasetToggle = (dataset) => {
+    setSelectedDatasets((prev) => ({
+      ...prev,
+      [dataset]: !prev[dataset],
+    }));
+  };
 
   const options = {
     responsive: true,
@@ -290,35 +303,76 @@ const PayoffChart = ({ chartData }) => {
     },
   };
 
+  // Only include selected datasets
+  const datasets = [];
+  
+  if (selectedDatasets.principal) {
+    datasets.push({
+      label: "Principal Payment",
+      data: chartData.principal,
+      borderColor: "rgba(53, 162, 235, 0.8)",
+      backgroundColor: "rgba(53, 162, 235, 0.5)",
+    });
+  }
+  
+  if (selectedDatasets.interest) {
+    datasets.push({
+      label: "Interest Payment",
+      data: chartData.interest,
+      borderColor: "rgba(255, 99, 132, 0.8)",
+      backgroundColor: "rgba(255, 99, 132, 0.5)",
+    });
+  }
+  
+  if (selectedDatasets.balance) {
+    datasets.push({
+      label: "Remaining Balance",
+      data: chartData.balance,
+      borderColor: "rgba(75, 192, 192, 0.8)",
+      backgroundColor: "rgba(75, 192, 192, 0.5)",
+      yAxisID: "y",
+    });
+  }
+
   const data = {
     labels: chartData.labels,
-    datasets: [
-      {
-        label: "Principal Payment",
-        data: chartData.principal,
-        borderColor: "rgba(53, 162, 235, 0.8)",
-        backgroundColor: "rgba(53, 162, 235, 0.5)",
-      },
-      {
-        label: "Interest Payment",
-        data: chartData.interest,
-        borderColor: "rgba(255, 99, 132, 0.8)",
-        backgroundColor: "rgba(255, 99, 132, 0.5)",
-      },
-      {
-        label: "Remaining Balance",
-        data: chartData.balance,
-        borderColor: "rgba(75, 192, 192, 0.8)",
-        backgroundColor: "rgba(75, 192, 192, 0.5)",
-        yAxisID: "y",
-      },
-    ],
+    datasets: datasets,
   };
 
   return (
-    <div className="chart-container">
-      <Line options={options} data={data} height={300} />
-    </div>
+    <>
+      <div className="chart-control-panel">
+        <div className="chart-checkboxes">
+          <label>
+            <input
+              type="checkbox"
+              checked={selectedDatasets.principal}
+              onChange={() => handleDatasetToggle("principal")}
+            />
+            <span className="principal-color">Principal Payment</span>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={selectedDatasets.interest}
+              onChange={() => handleDatasetToggle("interest")}
+            />
+            <span className="interest-color">Interest Payment</span>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={selectedDatasets.balance}
+              onChange={() => handleDatasetToggle("balance")}
+            />
+            <span className="balance-color">Remaining Balance</span>
+          </label>
+        </div>
+      </div>
+      <div className="chart-container">
+        <Line options={options} data={data} height={300} />
+      </div>
+    </>
   );
 };
 
